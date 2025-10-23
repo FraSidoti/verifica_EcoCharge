@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Colonnine Ricarica</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        .sidebar {
+            background-color: #f8f9fa;
+            padding: 20px;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .main-content {
+            padding: 20px;
+        }
+        .colonnina-marker {
+            cursor: pointer;
+        }
+        .utilizzo-basso { color: green; }
+        .utilizzo-medio { color: orange; }
+        .utilizzo-alto { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 sidebar">
+                <div id="auth-section">
+                    <h4>Accesso</h4>
+                    <div id="login-form">
+                        <div class="mb-3">
+                            <input type="email" class="form-control" id="login-email" placeholder="Email">
+                        </div>
+                        <div class="mb-3">
+                            <input type="password" class="form-control" id="login-password" placeholder="Password">
+                        </div>
+                        <button class="btn btn-primary w-100 mb-2" onclick="login()">Accedi</button>
+                        <button class="btn btn-outline-secondary w-100" onclick="showRegister()">Registrati</button>
+                    </div>
+                    
+                    <div id="register-form" style="display: none;">
+                        <h5>Registrazione Utente</h5>
+                        <div class="mb-2">
+                            <input type="text" class="form-control" id="reg-nome" placeholder="Nome">
+                        </div>
+                        <div class="mb-2">
+                            <input type="text" class="form-control" id="reg-cognome" placeholder="Cognome">
+                        </div>
+                        <div class="mb-2">
+                            <input type="email" class="form-control" id="reg-email" placeholder="Email">
+                        </div>
+                        <div class="mb-2">
+                            <input type="password" class="form-control" id="reg-password" placeholder="Password">
+                        </div>
+                        <div class="mb-2">
+                            <input type="tel" class="form-control" id="reg-telefono" placeholder="Telefono">
+                        </div>
+                        <div class="mb-2">
+                            <input type="text" class="form-control" id="reg-indirizzo" placeholder="Indirizzo">
+                        </div>
+                        <div class="mb-2">
+                            <input type="text" class="form-control" id="reg-citta" placeholder="Città">
+                        </div>
+                        <button class="btn btn-success w-100 mb-2" onclick="register()">Registrati</button>
+                        <button class="btn btn-outline-secondary w-100" onclick="showLogin()">Torna al Login</button>
+                    </div>
+                </div>
+                
+                <div id="user-info" style="display: none;">
+                    <h5>Benvenuto, <span id="user-name"></span></h5>
+                    <p id="user-type"></p>
+                    <button class="btn btn-danger w-100" onclick="logout()">Logout</button>
+                </div>
+                
+                <div id="admin-panel" style="display: none;">
+                    <h5>Pannello Admin</h5>
+                    <button class="btn btn-info w-100 mb-2" data-bs-toggle="modal" data-bs-target="#addColonninaModal">
+                        Aggiungi Colonnina
+                    </button>
+                    <button class="btn btn-info w-100 mb-2" data-bs-toggle="modal" data-bs-target="#addUtenteModal">
+                        Aggiungi Utente
+                    </button>
+                    <button class="btn btn-info w-100 mb-2" onclick="loadStatistiche()">
+                        Statistiche
+                    </button>
+                </div>
+                
+                <div id="user-panel" style="display: none;">
+                    <h5>Pannello Utente</h5>
+                    <button class="btn btn-info w-100 mb-2" data-bs-toggle="modal" data-bs-target="#prenotaModal">
+                        Prenota Colonnina
+                    </button>
+                    <button class="btn btn-info w-100 mb-2" onclick="loadVeicoli()">
+                        I Miei Veicoli
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-md-9 main-content">
+                <h2>Mappa Colonnine di Ricarica</h2>
+                <div id="map"></div>
+                <div id="colonnine-list" class="mt-3"></div>
+                <div id="statistiche-section" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Modal Aggiungi Colonnina -->
+    <div class="modal fade" id="addColonninaModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Aggiungi Colonnina</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-colonnina-form">
+                        <div class="mb-3">
+                            <label>Indirizzo</label>
+                            <input type="text" class="form-control" id="colonnina-indirizzo" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Latitudine</label>
+                            <input type="number" step="any" class="form-control" id="colonnina-lat" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Longitudine</label>
+                            <input type="number" step="any" class="form-control" id="colonnina-lng" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Potenza (kW)</label>
+                            <input type="number" step="0.01" class="form-control" id="colonnina-potenza" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>NIL</label>
+                            <input type="text" class="form-control" id="colonnina-nil">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="button" class="btn btn-primary" onclick="addColonnina()">Aggiungi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Prenotazione -->
+    <div class="modal fade" id="prenotaModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Prenota Colonnina</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="prenota-form">
+                        <div class="mb-3">
+                            <label>Veicolo</label>
+                            <select class="form-control" id="prenota-veicolo" required></select>
+                        </div>
+                        <div class="mb-3">
+                            <label>Colonnina</label>
+                            <select class="form-control" id="prenota-colonnina" required></select>
+                        </div>
+                        <div class="mb-3">
+                            <label>Data/Ora Inizio</label>
+                            <input type="datetime-local" class="form-control" id="prenota-inizio" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Data/Ora Fine</label>
+                            <input type="datetime-local" class="form-control" id="prenota-fine" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Energia (kWh)</label>
+                            <input type="number" step="0.01" class="form-control" id="prenota-energia" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="button" class="btn btn-primary" onclick="createPrenotazione()">Prenota</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let map;
+        let markers = [];
+        let currentUser = null;
+
+        // Inizializzazione mappa
+        function initMap() {
+            map = L.map('map').setView([41.9028, 12.4964], 6); // Centro su Italia
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            loadColonnine();
+        }
+
+        // Funzioni di autenticazione
+        async function login() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentUser = data.user;
+                    updateUI();
+                    loadColonnine();
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('Errore di connessione');
+            }
+        }
+
+        async function register() {
+            const formData = {
+                email: document.getElementById('reg-email').value,
+                password: document.getElementById('reg-password').value,
+                nome: document.getElementById('reg-nome').value,
+                cognome: document.getElementById('reg-cognome').value,
+                telefono: document.getElementById('reg-telefono').value,
+                indirizzo: document.getElementById('reg-indirizzo').value,
+                citta: document.getElementById('reg-citta').value
+            };
+            
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData),
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('Registrazione completata!');
+                    showLogin();
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('Errore di connessione');
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/logout', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                
+                currentUser = null;
+                updateUI();
+                loadColonnine();
+            } catch (error) {
+                alert('Errore di connessione');
+            }
+        }
+
+        // Caricamento colonnine
+        async function loadColonnine() {
+            try {
+                const response = await fetch('/api/colonnine', {
+                    credentials: 'include'
+                });
+                
+                const colonnine = await response.json();
+                
+                // Rimuovi markers esistenti
+                markers.forEach(marker => map.removeLayer(marker));
+                markers = [];
+                
+                // Aggiungi nuovi markers
+                colonnine.forEach(colonnina => {
+                    const marker = L.marker([colonnina.latitudine, colonnina.longitudine])
+                        .addTo(map)
+                        .bindPopup(`
+                            <b>${colonnina.indirizzo}</b><br>
+                            Potenza: ${colonnina.potenza_kw} kW<br>
+                            Utilizzo: <span class="utilizzo-${colonnina.classificazione}">${colonnina.classificazione}</span>
+                        `);
+                    
+                    markers.push(marker);
+                });
+                
+                // Aggiorna lista colonnine
+                updateColonnineList(colonnine);
+            } catch (error) {
+                console.error('Errore caricamento colonnine:', error);
+            }
+        }
+
+        function updateColonnineList(colonnine) {
+            const container = document.getElementById('colonnine-list');
+            container.innerHTML = '<h4>Lista Colonnine</h4>';
+            
+            colonnine.forEach(colonnina => {
+                const div = document.createElement('div');
+                div.className = 'card mb-2';
+                div.innerHTML = `
+                    <div class="card-body">
+                        <h6>${colonnina.indirizzo}</h6>
+                        <p>Potenza: ${colonnina.potenza_kw} kW<br>
+                        Utilizzo: <span class="utilizzo-${colonnina.classificazione}">${colonnina.classificazione}</span></p>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // Funzioni admin
+        async function addColonnina() {
+            const formData = {
+                indirizzo: document.getElementById('colonnina-indirizzo').value,
+                latitudine: parseFloat(document.getElementById('colonnina-lat').value),
+                longitudine: parseFloat(document.getElementById('colonnina-lng').value),
+                potenza_kw: parseFloat(document.getElementById('colonnina-potenza').value),
+                nil: document.getElementById('colonnina-nil').value
+            };
+            
+            try {
+                const response = await fetch('/api/colonnine', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData),
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('Colonnina aggiunta con successo!');
+                    $('#addColonninaModal').modal('hide');
+                    loadColonnine();
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('Errore di connessione');
+            }
+        }
+
+        async function loadStatistiche() {
+            try {
+                const response = await fetch('/api/admin/statistiche', {
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                displayStatistiche(data);
+            } catch (error) {
+                alert('Errore caricamento statistiche');
+            }
+        }
+
+        function displayStatistiche(data) {
+            const container = document.getElementById('statistiche-section');
+            container.style.display = 'block';
+            container.innerHTML = '<h4>Statistiche e Previsioni</h4>';
+            
+            // Aggiungi qui la visualizzazione delle statistiche con Chart.js
+            // Implementa grafici per le previsioni di domanda
+        }
+
+        // Funzioni utente
+        async function loadVeicoli() {
+            try {
+                const response = await fetch('/api/veicoli', {
+                    credentials: 'include'
+                });
+                
+                const veicoli = await response.json();
+                updateVeicoliSelect(veicoli);
+            } catch (error) {
+                alert('Errore caricamento veicoli');
+            }
+        }
+
+        function updateVeicoliSelect(veicoli) {
+            const select = document.getElementById('prenota-veicolo');
+            select.innerHTML = '';
+            
+            veicoli.forEach(veicolo => {
+                const option = document.createElement('option');
+                option.value = veicolo.id_veicolo;
+                option.textContent = `${veicolo.marca} ${veicolo.modello} (${veicolo.targa})`;
+                select.appendChild(option);
+            });
+        }
+
+        async function createPrenotazione() {
+            const formData = {
+                id_veicolo: document.getElementById('prenota-veicolo').value,
+                id_colonnina: document.getElementById('prenota-colonnina').value,
+                data_ora_inizio: document.getElementById('prenota-inizio').value,
+                data_ora_fine: document.getElementById('prenota-fine').value,
+                energia_kwh: parseFloat(document.getElementById('prenota-energia').value)
+            };
+            
+            try {
+                const response = await fetch('/api/prenotazioni', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData),
+                    credentials: 'include'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('Prenotazione creata con successo!');
+                    $('#prenotaModal').modal('hide');
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('Errore di connessione');
+            }
+        }
+
+        // UI helpers
+        function showRegister() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('register-form').style.display = 'block';
+        }
+
+        function showLogin() {
+            document.getElementById('register-form').style.display = 'none';
+            document.getElementById('login-form').style.display = 'block';
+        }
+
+        function updateUI() {
+            const authSection = document.getElementById('auth-section');
+            const userInfo = document.getElementById('user-info');
+            const adminPanel = document.getElementById('admin-panel');
+            const userPanel = document.getElementById('user-panel');
+            
+            if (currentUser) {
+                authSection.style.display = 'none';
+                userInfo.style.display = 'block';
+                document.getElementById('user-name').textContent = currentUser.name;
+                document.getElementById('user-type').textContent = `Tipo: ${currentUser.user_type}`;
+                
+                if (currentUser.user_type === 'admin') {
+                    adminPanel.style.display = 'block';
+                    userPanel.style.display = 'none';
+                } else {
+                    adminPanel.style.display = 'none';
+                    userPanel.style.display = 'block';
+                }
+            } else {
+                authSection.style.display = 'block';
+                userInfo.style.display = 'none';
+                adminPanel.style.display = 'none';
+                userPanel.style.display = 'none';
+            }
+        }
+
+        // Inizializzazione
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            updateUI();
+        });
+    </script>
+</body>
+</html>
